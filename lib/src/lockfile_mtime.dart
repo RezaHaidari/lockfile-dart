@@ -25,12 +25,8 @@ class MtimePrecision {
         rethrow;
       }
     } else {
-      // Set mtime by ceiling DateTime.now().millisecondsSinceEpoch to seconds + 5ms so that it's "not on the second"
-      var mtime = DateTime.fromMillisecondsSinceEpoch(
-          (DateTime.now().millisecondsSinceEpoch / 1000).ceil() * 1000 + 5);
-
       try {
-       // await File(file).setLastModified(mtime);
+        // await File(file).setLastModified(mtime);
         var stat = await Directory(file).stat();
         var precision =
             stat.modified.millisecondsSinceEpoch % 1000 == 0 ? 's' : 'ms';

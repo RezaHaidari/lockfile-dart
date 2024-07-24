@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:retry/retry.dart';
+
 class LockOptions {
   /// Duration in milliseconds in which the lock is considered stale, defaults to 10000 (minimum value is 5000)
   num? stale;
@@ -8,7 +10,7 @@ class LockOptions {
   num? update;
 
   /// The number of retries or a retry options object, defaults to 0
-  dynamic retries;
+  RetryOptions? retries;
 
   /// A custom fs to use, defaults to `graceful-fs`
   dynamic fs;
@@ -35,7 +37,7 @@ class LockOptions {
   LockOptions copyWith({
     num? stale,
     num? update,
-    dynamic retries,
+    RetryOptions? retries,
     dynamic fs,
     bool? realpath,
     void Function(Exception)? onCompromised,

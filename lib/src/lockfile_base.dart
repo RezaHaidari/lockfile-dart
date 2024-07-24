@@ -3,7 +3,6 @@ import 'dart:io';
 import 'dart:math';
 import 'package:lockfile/src/lockfile_mtime.dart';
 import 'package:lockfile/src/lockfile_types.dart';
-import 'package:path/path.dart' as path;
 import 'package:retry/retry.dart';
 
 class LockFileManager {
@@ -94,7 +93,7 @@ class LockFileManager {
       if (options.stale == null || options.stale! <= 0) {
         //throw Exception('Lock file is already being held');
 
-        throw RetryableException(Exception('Lock file is already being held'));
+        throw Exception('Lock file is already being held');
       }
 
       try {
@@ -105,8 +104,7 @@ class LockFileManager {
 
         if (!isLockStale(stat, options)) {
           //throw Exception('Lock file is already being held');
-          throw RetryableException(
-              Exception('Lock file is already being held'));
+          throw Exception('Lock file is already being held');
         }
 
         // If it's stale, remove it and try again!
@@ -120,7 +118,7 @@ class LockFileManager {
           options.stale = 0;
           return acquireLock(file, options);
         }
-        throw RetryableException(Exception('Error while acquiring lock: $err'));
+        throw Exception('Error while acquiring lock: $err');
       }
     }
   }
@@ -152,7 +150,7 @@ class LockFileManager {
 
         // If it failed to update the lockfile, keep trying unless
         // the lockfile was deleted or we are over the threshold
-        if (!File(lock.lockfilePath).existsSync()) {
+        if (!Directory(lock.lockfilePath).existsSync()) {
           if (isOverThreshold) {
             return setLockAsCompromised(file, lock, Exception('ECOMPROMISED'));
           }
@@ -175,7 +173,7 @@ class LockFileManager {
         final mtime = DateTime
             .now(); // Replace with mtimePrecision.getMtime(lock['mtimePrecision']);
 
-        File(lock.lockfilePath).setLastModified(mtime).then((_) {
+        touchFileInDirectory(lock.lockfilePath).then((_) {
           final isOverThreshold =
               lock.lastUpdate + stale < DateTime.now().millisecondsSinceEpoch;
 
@@ -205,7 +203,10 @@ class LockFileManager {
           final isOverThreshold =
               lock.lastUpdate + stale < DateTime.now().millisecondsSinceEpoch;
 
-          if (!File(lock.lockfilePath).existsSync() || isOverThreshold) {
+          print(isOverThreshold);
+          print(err);
+
+          if (!Directory(lock.lockfilePath).existsSync() || isOverThreshold) {
             return setLockAsCompromised(file, lock, Exception('ECOMPROMISED'));
           }
 
@@ -258,49 +259,77 @@ class LockFileManager {
     if (lock.options.onCompromised != null) lock.options.onCompromised!(err);
   }
 
-  Future<void> lock(String file, LockOptions options) async {
-    // Initialize and sanitize options
-    options = options.copyWith(
-      stale: 10000,
-      update: null,
-      realpath: true,
-      retries: 0,
-      onCompromised: (err) => {throw RetryableException(Exception(err))},
-    );
-
-    // Resolve to a canonical file path
-    String? resolvedFile;
-    try {
-      resolvedFile = await resolveCanonicalPath(file, options);
-    } catch (e) {
-      rethrow; // Handle error or rethrow
+  /// Touches a file in the specified directory to update the directory's timestamp.
+  ///
+  /// The [directoryPath] parameter specifies the path of the directory.
+  /// If the directory does not exist, a message will be printed and the method will return.
+  ///
+  /// This method creates a file named `.touch` in the specified directory and writes the
+  /// message "Touch file to update directory timestamp" to it. The file is then deleted.
+  ///
+  /// Throws an exception if there is an error while writing to or deleting the file.
+  Future<void> touchFileInDirectory(String directoryPath) async {
+    final directory = Directory(directoryPath);
+    if (!await directory.exists()) {
+      print('Directory does not exist.');
+      return;
     }
 
-    // Attempt to acquire the lock with retries
-    final r = RetryOptions(maxAttempts: options.retries);
-    await r.retry(
-      () async {
-        try {
-          final probe = await acquireLock(resolvedFile!, options);
-          // Lock acquired, store lock info
-          locks[resolvedFile] = Lock(
-            lockfilePath: getLockFile(file, options),
-            mtime: probe.mtime,
-            mtimePrecision: probe.mtimePrecision,
-            options: options,
-            lastUpdate: DateTime.now().millisecondsSinceEpoch,
-          );
-          // Keep the lock fresh to avoid staleness
-          updateLock(resolvedFile, options);
-        } catch (e) {
-          if (e is RetryableException) rethrow; // Allow retry
-          //throw NonRetryableException(e); // Prevent further retries
-        }
-      },
-      retryIf: (e) => e is RetryableException,
+    final file = File('${directory.path}/.touch');
+    await file.writeAsString('Touch file to update directory timestamp',
+        mode: FileMode.writeOnlyAppend);
+    await file.delete();
+  }
+
+  Future<dynamic> lock(String file, LockOptions options) async {
+    options = options.copyWith(
+      stale: options.stale ?? 10000,
+      update: options.update,
+      realpath: options.realpath ?? true,
+      retries: options.retries ?? RetryOptions(maxAttempts: 0),
+      onCompromised: (err) => {throw Exception(err)},
     );
 
-    // Logic for releasing the lock (to be implemented)
+    options.retries = options.retries ?? RetryOptions(maxAttempts: 0);
+
+    options.stale =
+        options.stale != null && options.stale! > 2000 ? options.stale : 2000;
+
+    options.update = options.update == null
+        ? max(options.stale! / 2, 1000)
+        : min(max(options.update!, 1000), options.stale! / 2);
+
+    String? resolvedFile = await resolveCanonicalPath(file, options);
+
+    final r = RetryOptions(
+      maxAttempts: options.retries?.maxAttempts ?? 0,
+      maxDelay: options.retries?.maxDelay ?? Duration(seconds: 0),
+    );
+
+    return await r.retry(
+      () async {
+        var probe = await acquireLock(resolvedFile!, options);
+
+        final lock = locks[resolvedFile] = Lock(
+          lockfilePath: getLockFile(file, options),
+          mtime: probe.mtime,
+          mtimePrecision: probe.mtimePrecision,
+          options: options,
+          lastUpdate: DateTime.now().millisecondsSinceEpoch,
+        );
+
+        updateLock(resolvedFile, options);
+
+        if (lock.released == true) {
+          throw Exception('Lock is already released');
+        }
+
+        options.realpath = false;
+
+        await unlock(resolvedFile, options);
+      },
+      retryIf: (e) => e is IOException,
+    );
   }
 
   Future<void> unlock(String file, LockOptions options) async {
@@ -386,4 +415,3 @@ class LockFileManager {
     });
   }
 }
-

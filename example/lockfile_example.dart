@@ -1,17 +1,42 @@
 import 'package:lockfile/lockfile.dart';
+import 'package:retry/retry.dart';
 
 void main() async {
   var lock = LockFileManager();
-  await lock.lock('./example.txt', LockOptions());
+ await lock.lock('./example.txt', LockOptions(
+    retries: RetryOptions(
+      maxDelay: Duration(seconds: 10),
+      maxAttempts: 3,
+    ),
+  ));
 
-  var isLocked = await lock.check('./example.txt', LockOptions());
-  print("Is locked: $isLocked");
+// callback(releasedCallback : () async {
+//     print("Released");
+//   }
+//   );
 
-  Future.delayed(Duration(seconds: 5), () async {
-    await lock.unlock('./example.txt', LockOptions());
+  // var lock = LockFileManager();
+  // var callback = await lock.lock('./example.txt', LockOptions(
+  //   retries: RetryOptions(
+  //     maxDelay: Duration(seconds: 1),
+  //     maxAttempts: 3,
+  //   ),
+  // ));
 
-    isLocked = await lock.check('./example.txt', LockOptions());
+// callback(releasedCallback : () async {
+//     print("Released");
+//   }
+//   );
 
-    print("Is locked: $isLocked");
-  });
+
+  // var isLocked = await lock.check('./example.txt', LockOptions());
+  // print("Is locked: $isLocked");
+
+  // Future.delayed(Duration(seconds: 5), () async {
+  //   await lock.unlock('./example.txt', LockOptions());
+
+  //   isLocked = await lock.check('./example.txt', LockOptions());
+
+  //   print("Is locked: $isLocked");
+  // });
 }
