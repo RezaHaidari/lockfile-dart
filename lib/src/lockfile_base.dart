@@ -25,7 +25,7 @@ class LockFileManager {
   /// @param {String} file
   /// @param {InternalLockOptions} options
   Future<String?> resolveCanonicalPath(String file, LockOptions options) {
-    if (options.realpath == null) {
+    if (options.realpath == false) {
       return Future.value(file);
     }
 
@@ -203,9 +203,6 @@ class LockFileManager {
           final isOverThreshold =
               lock.lastUpdate + stale < DateTime.now().millisecondsSinceEpoch;
 
-          print(isOverThreshold);
-          print(err);
-
           if (!Directory(lock.lockfilePath).existsSync() || isOverThreshold) {
             return setLockAsCompromised(file, lock, Exception('ECOMPROMISED'));
           }
@@ -334,8 +331,8 @@ class LockFileManager {
 
   Future<void> unlock(String file, LockOptions options) async {
     options = options.copyWith(
-      realpath: true,
-      fs: Directory,
+      realpath: options.realpath ?? true,
+      fs: options.fs ?? Directory,
     );
 
     String? resolvedFile;
