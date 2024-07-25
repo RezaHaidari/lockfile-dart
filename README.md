@@ -1,6 +1,6 @@
 # Dart Lockfile Library
 
-The Dart Lockfile Library is a powerful tool for managing lockfiles in Dart projects. It provides various methods and options to ensure consistent and reliable dependency resolution.
+This Dart library utilizes the mkdir strategy which works atomically on any kind of file system, even network based ones. The lockfile path is based on the file path you are trying to lock by suffixing it with .lock.
 
 ## Installation
 
@@ -8,7 +8,7 @@ To use the Dart Lockfile Library in your project, add the following dependency t
 
 ```yaml
 dependencies:
-    lockfile: ^1.0.0
+  lockfile: ^1.0.0
 ```
 
 Then, run `pub get` to fetch the library.
@@ -16,7 +16,6 @@ Then, run `pub get` to fetch the library.
 ## Usage
 
 Create an instance of LockFileManager
-
 
 ```dart
 
@@ -28,26 +27,34 @@ Call the lock method to acquire a lock on a file
 
 ```dart
 
-lockFileManager.lock('path/to/file', LockOptions());
+await lock.lock(
+  'path/to/file',
+  LockOptions(
+    retries: RetryOptions(
+    maxDelay: Duration(milliseconds: 20),
+    maxAttempts: 3,
+    ),
+  ));
 
 ```
 
 Call the unlock method to release the lock on a file
 
 ```dart
-lockFileManager.unlock('path/to/file', LockOptions());
+await lockFileManager.unlock('path/to/file', LockOptions());
 
 ```
 
 Call the check method to check if a file is locked
 
 ```dart
-final isLocked = lockFileManager.check('path/to/file', LockOptions());
+final isLocked = await lockFileManager.check('path/to/file', LockOptions());
 
 ```
 
 Get the locks
+
 ```dart
-final locks = lockFileManager.getLocks();
+final locks = await lockFileManager.getLocks();
 
 ```
