@@ -1,6 +1,6 @@
 name: lockfile
-description: A library for working with lockfiles.
-version: 1.0.0
+description: a lockfile utility that works on a local or network file system.
+version: 1.0.1
 # repository: https://github.com/my_org/my_repo
 
 environment:

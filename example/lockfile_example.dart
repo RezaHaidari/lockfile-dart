@@ -1,5 +1,4 @@
 import 'package:lockfile/lockfile.dart';
-import 'package:retry/retry.dart';
 
 void main() async {
   var lock = LockFileManager();
