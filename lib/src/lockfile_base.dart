@@ -59,6 +59,11 @@ class LockFileManager {
     Directory(lockfilePath).delete().then((_) {
       return;
     }).catchError((err) {
+
+      // If the lockfile does not exist, ignore the error
+      if (err is FileSystemException && err.osError?.errorCode == 2) {
+        return;
+      }
       throw err;
     });
   }
