@@ -12,4 +12,8 @@ void main() async {
           maxAttempts: 3,
         ),
       ));
+
+      // remove the lock file
+
+   await lock.removeLock('./example1.txt', LockOptions());
 }
