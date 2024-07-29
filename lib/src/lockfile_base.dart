@@ -59,7 +59,6 @@ class LockFileManager {
     Directory(lockfilePath).delete().then((_) {
       return;
     }).catchError((err) {
-
       // If the lockfile does not exist, ignore the error
       if (err is FileSystemException && err.osError?.errorCode == 2) {
         return;
@@ -396,13 +395,18 @@ class LockFileManager {
   }
 
   void onExit() {
-    ProcessSignal.sigterm.watch().listen((signal) {
-      cleanupLocks();
-    });
-    ProcessSignal.sigint.watch().listen((signal) {
-      cleanupLocks();
-      exit(0); // Ensure the process exits after cleanup
-    });
+    if (Platform.isWindows) {
+      // Windows does not support SIGTERM, so we use SIGINT instead
+      ProcessSignal.sigint.watch().listen((signal) {
+        cleanupLocks();
+        exit(0); // Ensure the process exits after cleanup
+      });
+    } else {
+      // For non-Windows platforms, we can use SIGTERM
+      ProcessSignal.sigterm.watch().listen((signal) {
+        cleanupLocks();
+      });
+    }
   }
 
   void cleanupLocks() {
